@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2019-2021, Intel Corporation
+# Copyright 2023 FUJITSU LIMITED
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -36,7 +37,7 @@ import platform
 from numpy import get_include as get_numpy_include
 from distutils.sysconfig import get_python_inc as get_python_include
 
-def ensure_Intel_compiler():
+def ensure_GCC_compiler():
     ccompiler = new_compiler()
     customize_compiler(ccompiler)
     if hasattr(ccompiler, 'compiler'):
@@ -44,8 +45,8 @@ def ensure_Intel_compiler():
     else:
         compiler_name = ccompiler.__class__.__name__
 
-    assert ('icl' in compiler_name or 'icc' in compiler_name), \
-        "Intel(R) C Compiler is required to build mkl_umath, found {}".format(compiler_name)
+    assert ('gcc' in compiler_name), \
+        "GCC is required to build mkl_umath, found {}".format(compiler_name)
     
 
 def load_module(name, fn):
@@ -71,24 +72,13 @@ def configuration(parent_package='',top_path=None):
     from numpy.distutils.system_info import get_info
     config = Configuration('mkl_umath', parent_package, top_path)
 
-    mkl_root = environ.get('MKLROOT', None)
-    if mkl_root:
-        mkl_info = {
-            'include_dirs': [join(mkl_root, 'include')],
-            'library_dirs': [join(mkl_root, 'lib'), join(mkl_root, 'lib', 'intel64')],
-            'libraries': ['mkl_rt']
-        }
-    else:
-        mkl_info = get_info('mkl')
-
-    print(mkl_info)
-    mkl_include_dirs = mkl_info.get('include_dirs', [])
-    mkl_library_dirs = mkl_info.get('library_dirs', [])
-    mkl_libraries = mkl_info.get('libraries', ['mkl_rt'])
+    sleef_root = environ.get('SLEEF_PATH', None)
+    mkl_include_dirs = join(sleef_root, 'include')
+    mkl_library_dirs = join(sleef_root, 'lib64')
+    mkl_libraries = ['sleef']
 
     pdir = dirname(__file__)
     wdir = join(pdir, 'src')
-    mkl_info = get_info('mkl')
 
     generate_umath_py = join(pdir, 'generate_umath.py')
     n = separator_join('_', (config.name, 'generate_umath'))
@@ -111,12 +101,11 @@ def configuration(parent_package='',top_path=None):
 
     sources = [generate_umath_c]
 
-    # ensure_Intel_compiler()
+    ensure_GCC_compiler()
 
-    if platform.system() == "Windows":
-        eca = ['/fp:fast=2', '/Qimf-precision=high', '/Qprec-sqrt', '/Qstd=c99', '/Qprotect-parens']
-    else:
-        eca = ['-fp-model', 'fast=2', '-fimf-precision=high', '-prec-sqrt', '-fprotect-parens']
+
+    if platform.system() == "Linux":
+        eca = ['-march=armv8.2-a+fp16+sve', '-O3']
 
     numpy_include_dir = get_numpy_include()
     python_include_dir = get_python_include()
@@ -126,7 +115,7 @@ def configuration(parent_package='',top_path=None):
             join(wdir, 'loops_intel.h.src'),
             join(wdir, 'loops_intel.c.src'),
         ],
-        include_dirs = [wdir] + mkl_include_dirs + [numpy_include_dir, python_include_dir],
+        include_dirs = [wdir] + [mkl_include_dirs] + [numpy_include_dir, python_include_dir],
         depends = [
             join(wdir, 'blocking_utils.h'),
             join(wdir, 'fast_loop_macros.h'),
@@ -147,7 +136,7 @@ def configuration(parent_package='',top_path=None):
             join(wdir, 'loops_intel.c.src'),
             join(wdir, 'loops_intel.h.src'),
         ],
-        include_dirs = [wdir] + mkl_include_dirs,
+        include_dirs = [wdir] + [mkl_include_dirs],
         libraries = mkl_libraries + ['loops_intel'],
         library_dirs = mkl_library_dirs,
         extra_compile_args = [

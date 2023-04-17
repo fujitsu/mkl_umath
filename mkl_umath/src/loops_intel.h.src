@@ -1,5 +1,7 @@
 /*
+ * Copyright (c) 2005-2023, NumPy Developers.
  * Copyright (c) 2019-2021, Intel Corporation
+ * Copyright 2023 FUJITSU LIMITED
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,275 +34,72 @@
 
 #include <string.h>
 
+#define NPYV_IMPL_MAXSTRIDE(SFX, MAXLOAD, MAXSTORE) \
+    NPY_FINLINE int npyv_loadable_stride_##SFX(npy_intp stride) \
+    { return MAXLOAD > 0 ? llabs(stride) <= MAXLOAD : 1; } \
+    NPY_FINLINE int npyv_storable_stride_##SFX(npy_intp stride) \
+    { return MAXSTORE > 0 ? llabs(stride) <= MAXSTORE : 1; }
+
+NPYV_IMPL_MAXSTRIDE(u32, 0, 0)
+NPYV_IMPL_MAXSTRIDE(s32, 0, 0)
+NPYV_IMPL_MAXSTRIDE(f32, 0, 0)
+NPYV_IMPL_MAXSTRIDE(u64, 0, 0)
+NPYV_IMPL_MAXSTRIDE(s64, 0, 0)
+NPYV_IMPL_MAXSTRIDE(f64, 0, 0)
+
+/*
+ * nomemoverlap - returns false if two strided arrays have an overlapping
+ * region in memory. ip_size/op_size = size of the arrays which can be negative
+ * indicating negative steps.
+ */
+NPY_FINLINE npy_bool
+nomemoverlap(char *ip, npy_intp ip_size, char *op, npy_intp op_size)
+{
+    char *ip_start, *ip_end, *op_start, *op_end;
+    if (ip_size < 0) {
+        ip_start = ip + ip_size;
+        ip_end = ip;
+    }
+    else {
+        ip_start = ip;
+        ip_end = ip + ip_size;
+    }
+    if (op_size < 0) {
+        op_start = op + op_size;
+        op_end = op;
+    }
+    else {
+        op_start = op;
+        op_end = op + op_size;
+    }
+    return (ip_start == op_start && op_end == ip_end) ||
+           (ip_start > op_end) || (op_start > ip_end);
+}
+
+// returns true if two strided arrays have an overlapping region in memory
+// same as `nomemoverlap()` but requires array length and step sizes
+NPY_FINLINE npy_bool
+is_mem_overlap(const void *src, npy_intp src_step, const void *dst, npy_intp dst_step, npy_intp len)
+{
+    return !(nomemoverlap((char*)src, src_step*len, (char*)dst, dst_step*len));
+}
+
 /**begin repeat
  * Float types
  *  #TYPE = FLOAT, DOUBLE#
+ *  #type = float, double#
+ *  #sfx = f32, f64#
  */
-
-NPY_NO_EXPORT void
-@TYPE@_sqrt(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_invsqrt(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_exp(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_exp2(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_expm1(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_erf(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_log(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_log2(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_log10(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_log1p(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_cos(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_sin(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_tan(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arccos(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arcsin(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arctan(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_cosh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_sinh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_tanh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arccosh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arcsinh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_arctanh(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_fabs(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_floor(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_ceil(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_rint(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_trunc(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_cbrt(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
 /**begin repeat1
- * Arithmetic
- * # kind = add, subtract, multiply, divide#
+ * #func = sin, cos, tan, arcsin, arccos, arctan,
+           sinh, cosh, tanh, arcsinh, arccosh, arctanh,
+           exp, exp2, expm1, log, log2, log10, log1p,
+           sqrt, cbrt#
  */
 NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
+@TYPE@_@func@(char **args, const npy_intp *dimensions, const npy_intp *steps, void *NPY_UNUSED(func));
 /**end repeat1**/
-
-/**begin repeat1
- * Arithmetic
- * # kind = equal, not_equal, less, less_equal, greater, greater_equal,
- *        logical_and, logical_or#
- */
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-NPY_NO_EXPORT void
-@TYPE@_logical_xor(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_logical_not(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-/**begin repeat1
- * #kind = isnan, isinf, isfinite, signbit#
- **/
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-NPY_NO_EXPORT void
-@TYPE@_spacing(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-
-NPY_NO_EXPORT void
-@TYPE@_copysign(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_nextafter(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-/**begin repeat1
- * #kind = maximum, minimum, fmax, fmin#
- **/
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-NPY_NO_EXPORT void
-@TYPE@_floor_divide(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_remainder(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_divmod(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_square(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_reciprocal(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@__ones_like(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@_conjugate(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_absolute(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_negative(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_positive(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_sign(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_modf(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_frexp(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_ldexp(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_ldexp_long(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-#define @TYPE@_true_divide @TYPE@_divide
-
 /**end repeat**/
 
-/*
- *****************************************************************************
- **                           COMPLEX LOOPS                                 **
- *****************************************************************************
- */
-
-#define CGE(xr,xi,yr,yi) (xr > yr || (xr == yr && xi >= yi));
-#define CLE(xr,xi,yr,yi) (xr < yr || (xr == yr && xi <= yi));
-#define CGT(xr,xi,yr,yi) (xr > yr || (xr == yr && xi > yi));
-#define CLT(xr,xi,yr,yi) (xr < yr || (xr == yr && xi < yi));
-#define CEQ(xr,xi,yr,yi) (xr == yr && xi == yi);
-#define CNE(xr,xi,yr,yi) (xr != yr || xi != yi);
-
-/**begin repeat
- * complex types
- * #TYPE = CFLOAT, CDOUBLE#
- */
-
-/**begin repeat1
- * arithmetic
- * #kind = add, subtract#
- */
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-NPY_NO_EXPORT void
-@TYPE@_multiply(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_divide(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-NPY_NO_EXPORT void
-@TYPE@_floor_divide(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-
-
-/**begin repeat1
- * arithmetic
- * #kind = greater, greater_equal, less, less_equal, equal, 
-           not_equal, logical_and, logical_or, logical_xor, logical_not,
-	   isnan, isinf, isfinite#
- */
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-NPY_NO_EXPORT void
-@TYPE@_square(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@_reciprocal(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@__ones_like(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@_conjugate(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@_absolute(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@__arg(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-NPY_NO_EXPORT void
-@TYPE@_sign(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(data));
-
-/**begin repeat1
- * arithmetic
- * #kind = maximum, minimum, fmax, fmin#
- */
-NPY_NO_EXPORT void
-@TYPE@_@kind@(char **args, npy_intp *dimensions, npy_intp *steps, void *NPY_UNUSED(func));
-/**end repeat1**/
-
-#define @TYPE@_true_divide @TYPE@_divide
-
-/**end repeat**/
-
-#undef CGE
-#undef CLE
-#undef CGT
-#undef CLT
-#undef CEQ
-#undef CNE
 
 #endif

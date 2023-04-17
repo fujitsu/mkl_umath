@@ -1,4 +1,5 @@
 # Copyright (c) 2019-2021, Intel Corporation
+# Copyright 2023 FUJITSU LIMITED
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 '''
-Implementation of Numpy universal math functions using Intel(R) MKL and Intel(R) C compiler runtime.
+Implementation of Numpy universal math functions using SLEEF.
 '''
 
 from ._version import __version__

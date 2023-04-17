@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2019-2021, Intel Corporation
+# Copyright 2023 FUJITSU LIMITED
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -72,18 +73,18 @@ def setup_package():
     from numpy.distutils.core import setup
     metadata = dict(
         name = 'mkl_umath',
-        maintainer = "Intel Corp.",
-        maintainer_email = "scripting@intel.com",
-        description = "MKL-based universal functions for NumPy arrays",
-        long_description = """Universal functions for real and complex floating point arrays powered by Intel(R) Math Kernel Library Vector (Intel(R) MKL) and Intel(R) Short Vector Math Library (Intel(R) SVML)""",
-        url = "http://github.com/IntelPython/mkl_umath",
-        author = "Intel Corporation",
-        download_url = "http://github.com/IntelPython/mkl_umath",
+        maintainer = "Fujitsu Limited",
+        #        maintainer_email = "",
+        description = "SSL2-and-SLEEF-based universal functions for NumPy arrays",
+        long_description = """Universal functions for real floating point arrays powered by SLEEF""",
+        url = "http://github.com/fujitsu/mkl_umath",
+        author = "Fujitsu Limited",
+        download_url = "http://github.com/fujitsu/mkl_umath",
         license = 'BSD',
         classifiers = [_f for _f in CLASSIFIERS.split('\n') if _f],
-        platforms = ["Windows", "Linux", "Mac OS-X"],
+        platforms = ["Linux"],
         test_suite = 'nose.collector',
-        python_requires = '>=3.6',
+        python_requires = '>=3.9',
         install_requires = ['numpy'],
         configuration = configuration
     )
