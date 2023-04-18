@@ -17,6 +17,7 @@ AArch64 SVE instruction set.
 - GCC (10.2.x or later is mandatory, because ACLE (Arm C Language Extension) support is needed.)
 - ninja-build
 - NumPy (1.24.x or later is recommended.)
+- Python3 (3.9.x or later is recommended.)
 
 ## Build and Install
 ### Build SLEEF
